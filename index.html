@@ -73,13 +73,131 @@
         <div class="key-setting-box">
             <label style="font-size:12px; color:var(--text-muted); display:block; margin-bottom:4px;">🔑 내 Gemini API Key 세팅 (보안 보장)</label>
             <div style="display:flex; gap:6px;">
-                <input type="password" id="apiKeyInput" class="form-control" style="padding:8px; font-size:13px;" placeholder="AIzaSy...로 시작하는 새 키를 넣어주세요">
+                <input type="text" id="apiKeyInput" class="form-control" style="padding:8px; font-size:13px;" placeholder="AIzaSy... 키를 입력하세요">
                 <button id="saveKeyBtn" class="btn btn-secondary" style="width:auto; padding:0 12px; margin:0; font-size:13px;" onclick="saveApiKey()">저장 및 시작</button>
             </div>
-            <div id="saveStatus" style="font-size:12px; color:#ffd32a; margin-top:6px; display:none;"></div>
+            <div id="saveStatus" style="font-size:12px; color:#4cd137; margin-top:6px; display:none;"></div>
         </div>
 
         <div class="cellar-grid" id="cellarGrid"></div>
     </div>
 
-    <div id="tab
+    <div id="tab-record" class="container">
+        <h1>새로운 와인 기록</h1>
+        
+        <div class="photo-row">
+            <div class="photo-uploader" onclick="document.getElementById('fileFront').click()">
+                <input type="file" id="fileFront" accept="image/*" style="display:none" onchange="previewImage(this, 'imgFront')">
+                <img id="imgFront" style="display:none">
+                <span>📸 앞면 사진<br>(리스트 확인용)</span>
+            </div>
+            <div class="photo-uploader" onclick="document.getElementById('fileBack').click()">
+                <input type="file" id="fileBack" accept="image/*" style="display:none" onchange="processBackLabel(this)">
+                <img id="imgBack" style="display:none">
+                <span>🔍 뒷면 라벨<br>(자동 AI 분석)</span>
+            </div>
+        </div>
+
+        <div class="ai-status" id="aiStatus">뒷면 라벨을 분석하고 있습니다... 잠시만 기다려주세요.</div>
+
+        <input type="hidden" id="selectedSlot" value="">
+        <div class="form-group"><label>와인 이름</label><input type="text" id="wName" class="form-control" placeholder="예: 요리오 몬테풀치아노"></div>
+        <div class="form-group"><label>생산 연도 (빈티지)</label><input type="number" id="wVintage" class="form-control" placeholder="예: 2023"></div>
+        <div class="form-group"><label>생산 국가 / 지역</label><input type="text" id="wRegion" class="form-control" placeholder="예: 이탈리아 / Abruzzo"></div>
+        <div class="form-group"><label>포도 품종</label><input type="text" id="wVariety" class="form-control" placeholder="예: 몬테풀치아노"></div>
+        <div class="form-group"><label>가격 (원)</label><input type="number" id="wPrice" class="form-control" placeholder="구매 가격 입력"></div>
+        <div class="form-group"><label>알코올 도수 (%)</label><input type="text" id="wAbv" class="form-control" placeholder="예: 13.5"></div>
+
+        <div class="form-group"><label>단맛 (Sweetness)</label><div class="star-rating" data-taste="sweet">
+            <span class="star" data-value="1">★</span><span class="star" data-value="2">★</span><span class="star" data-value="3">★</span><span class="star" data-value="4">★</span><span class="star" data-value="5">★</span>
+        </div></div>
+        <div class="form-group"><label>신맛 (Acidity)</label><div class="star-rating" data-taste="acid">
+            <span class="star" data-value="1">★</span><span class="star" data-value="2">★</span><span class="star" data-value="3">★</span><span class="star" data-value="4">★</span><span class="star" data-value="5">★</span>
+        </div></div>
+        <div class="form-group"><label>타닌 (Tannins)</label><div class="star-rating" data-taste="tannin">
+            <span class="star" data-value="1">★</span><span class="star" data-value="2">★</span><span class="star" data-value="3">★</span><span class="star" data-value="4">★</span><span class="star" data-value="5">★</span>
+        </div></div>
+        <div class="form-group"><label>바디감 (Body)</label><div class="star-rating" data-taste="body">
+            <span class="star" data-value="1">★</span><span class="star" data-value="2">★</span><span class="star" data-value="3">★</span><span class="star" data-value="4">★</span><span class="star" data-value="5">★</span>
+        </div></div>
+        <div class="form-group"><label>여운 (Finish)</label><div class="star-rating" data-taste="finish">
+            <span class="star" data-value="1">★</span><span class="star" data-value="2">★</span><span class="star" data-value="3">★</span><span class="star" data-value="4">★</span><span class="star" data-value="5">★</span>
+        </div></div>
+
+        <div class="form-group"><label>나만의 메모 / 페어링 일기</label><textarea id="wMemo" class="form-control" rows="3" placeholder="기억하고 싶은 내용을 자유롭게 기록해 보세요."></textarea></div>
+
+        <button class="btn btn-primary" onclick="saveWine()">와인셀러에 보관하기</button>
+    </div>
+
+    <div id="tab-list" class="container">
+        <h1>마신 와인 아카이브</h1>
+        <div id="wineListContainer"></div>
+    </div>
+
+    <div class="modal" id="detailModal">
+        <div class="modal-content">
+            <span class="close-modal" onclick="closeModal()">&times;</span>
+            <h2 id="mName" style="margin-bottom:8px; font-size:20px;"></h2>
+            <p id="mMeta" style="color:var(--text-muted); font-size:14px; margin-bottom:15px;"></p>
+            
+            <div style="display:flex; gap:12px; margin-bottom:15px;">
+                <img id="mImg" style="width:110px; height:140px; object-fit:cover; border-radius:8px; background:#222;">
+                <div style="flex:1; font-size:14px; display:flex; flex-direction:column; gap:6px;">
+                    <div><strong>가격:</strong> <span id="mPrice"></span>원</div>
+                    <div><strong>도수:</strong> <span id="mAbv"></span>%</div>
+                    <div><strong>품종:</strong> <span id="mVariety"></span></div>
+                    <div><strong>메모:</strong> <span id="mMemo" style="color:#bbb;"></span></div>
+                </div>
+            </div>
+
+            <div class="radar-container"><canvas id="radarChart"></canvas></div>
+            <div id="aiPairingBox" class="ai-box"></div>
+        </div>
+    </div>
+
+    <div class="tab-bar">
+        <button id="btn-nav-cellar" class="tab-item active" onclick="switchTab('cellar')">
+            <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c0 1.1.9-2 2-2V5c0-1.1-.9-2-2-2zm-1 14H6v-2h12v2zm0-4H6v-2h12v2zm0-4H6V7h12v2z"/></svg>
+            와인셀러
+        </button>
+        <button id="btn-nav-record" class="tab-item" onclick="switchTab('record')">
+            <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+            기록등록
+        </button>
+        <button id="btn-nav-list" class="tab-item" onclick="switchTab('list')">
+            <svg viewBox="0 0 24 24"><path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H8V4h12v12z"/></svg>
+            아카이브
+        </button>
+    </div>
+
+    <script>
+        let wineStorage = JSON.parse(localStorage.getItem('symptomer_wines')) || {};
+        let ratings = { sweet: 0, acid: 0, tannin: 0, body: 0, finish: 0 };
+        let currentChart = null;
+
+        document.addEventListener("DOMContentLoaded", () => {
+            try {
+                const savedKey = localStorage.getItem('symptomer_gemini_key');
+                if(savedKey) {
+                    document.getElementById('apiKeyInput').value = savedKey;
+                    const status = document.getElementById('saveStatus');
+                    status.style.display = 'block';
+                    status.innerText = "✅ 기존 API 키가 정상 탑재되었습니다.";
+                }
+            } catch(e) {}
+            renderCellar();
+            renderList();
+            initStars();
+        });
+
+        function saveApiKey() {
+            // 어떤 특수문자가 들어와도 충돌하지 않도록 안전하게 처리
+            const keyInput = document.getElementById('apiKeyInput');
+            const rawKey = keyInput ? keyInput.value : '';
+            const key = String(rawKey).trim();
+            
+            try {
+                localStorage.setItem('symptomer_gemini_key', key);
+            } catch(e) {
+                console.log("로컬스토리지 예외 우회");
+            }
