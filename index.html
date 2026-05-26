@@ -176,28 +176,296 @@
         let currentChart = null;
 
         document.addEventListener("DOMContentLoaded", () => {
-            try {
-                const savedKey = localStorage.getItem('symptomer_gemini_key');
-                if(savedKey) {
-                    document.getElementById('apiKeyInput').value = savedKey;
-                    const status = document.getElementById('saveStatus');
-                    status.style.display = 'block';
-                    status.innerText = "✅ 기존 API 키가 정상 탑재되었습니다.";
-                }
-            } catch(e) {}
+            const savedKey = localStorage.getItem('symptomer_gemini_key');
+            if(savedKey) {
+                document.getElementById('apiKeyInput').value = savedKey;
+                const status = document.getElementById('saveStatus');
+                status.style.display = 'block';
+                status.innerText = "✅ 기존 API 키가 정상 탑재되었습니다.";
+            }
             renderCellar();
             renderList();
             initStars();
         });
 
         function saveApiKey() {
-            // 어떤 특수문자가 들어와도 충돌하지 않도록 안전하게 처리
             const keyInput = document.getElementById('apiKeyInput');
-            const rawKey = keyInput ? keyInput.value : '';
-            const key = String(rawKey).trim();
+            const key = keyInput ? keyInput.value.trim() : '';
             
-            try {
-                localStorage.setItem('symptomer_gemini_key', key);
-            } catch(e) {
-                console.log("로컬스토리지 예외 우회");
+            localStorage.setItem('symptomer_gemini_key', key);
+            
+            const status = document.getElementById('saveStatus');
+            if(status) {
+                status.style.display = 'block';
+                status.innerText = "🚀 연동 완료! 아래 '1번 칸'을 눌러 기록을 시작하세요!";
             }
+        }
+
+        function getApiKey() {
+            return localStorage.getItem('symptomer_gemini_key') || '';
+        }
+
+        function switchTab(tabName) {
+            document.querySelectorAll('.container').forEach(c => c.classList.remove('active'));
+            document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+            
+            const targetContainer = document.getElementById(`tab-${tabName}`);
+            const targetBtn = document.getElementById(`btn-nav-${tabName}`);
+            
+            if(targetContainer) targetContainer.classList.add('active');
+            if(targetBtn) targetBtn.classList.add('active');
+        }
+
+        function previewImage(input, targetId) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const img = document.getElementById(targetId);
+                    if(img) {
+                        img.src = e.target.result;
+                        img.style.display = 'block';
+                    }
+                }
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+
+        async function processBackLabel(input) {
+            previewImage(input, 'imgBack');
+            const key = getApiKey();
+            if(!key) return alert('Gemini API Key를 먼저 저장해 주세요!');
+            if (!input.files || !input.files[0]) return;
+
+            const statusDiv = document.getElementById('aiStatus');
+            if(statusDiv) {
+                statusDiv.style.display = 'block';
+                statusDiv.innerText = "🔍 뒷면 라벨 분석 중...";
+            }
+
+            const file = input.files[0];
+            const reader = new FileReader();
+            
+            reader.onload = async function(e) {
+                const base64Data = e.target.result.split(',')[1];
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`;
+                const prompt = "This is a wine back label. Extract the following information in strict JSON format: {name: 'Wine Name', vintage: 'Year or null', region: 'Country and Region', variety: 'Grape variety', abv: 'Alcohol % without percentage sign'}. Answer ONLY with the raw JSON object, do not wrap in markdown block.";
+
+                try {
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            contents: [{ parts: [{ text: prompt }, { inlineData: { mimeType: file.type, data: base64Data } }] }]
+                        })
+                    });
+
+                    const result = await response.json();
+                    const txt = result.candidates[0].content.parts[0].text.trim();
+                    const cleanJson = txt.replace(/```json|```/g, "");
+                    const data = JSON.parse(cleanJson);
+
+                    if(data.name) document.getElementById('wName').value = data.name;
+                    if(data.vintage) document.getElementById('wVintage').value = data.vintage;
+                    if(data.region) document.getElementById('wRegion').value = data.region;
+                    if(data.variety) document.getElementById('wVariety').value = data.variety;
+                    if(data.abv) document.getElementById('wAbv').value = data.abv;
+
+                    if(statusDiv) {
+                        statusDiv.innerText = "🎉 AI 라벨 분석 자동 매핑 완료!";
+                        setTimeout(() => statusDiv.style.display = 'none', 2000);
+                    }
+                } catch (err) {
+                    console.error(err);
+                    if(statusDiv) statusDiv.innerText = "❌ 분석 실패 (키 상태를 확인해 주세요)";
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function initStars() {
+            document.querySelectorAll('.star-rating').forEach(container => {
+                const taste = container.getAttribute('data-taste');
+                const stars = container.querySelectorAll('.star');
+                stars.forEach(star => {
+                    star.addEventListener('click', () => {
+                        const val = parseInt(star.getAttribute('data-value'));
+                        ratings[taste] = val;
+                        stars.forEach((s, idx) => {
+                            if(idx < val) s.classList.add('selected');
+                            else s.classList.remove('selected');
+                        });
+                    });
+                });
+            });
+        }
+
+        function renderCellar() {
+            const grid = document.getElementById('cellarGrid');
+            if(!grid) return;
+            grid.innerHTML = '';
+            for (let i = 1; i <= 10; i++) {
+                const wine = wineStorage[i];
+                let html = `<div class="cellar-slot ${wine ? 'occupied' : ''}" onclick="clickSlot(${i})" id="slot-${i}">`;
+                html += `<span class="slot-num">${i}번 칸</span>`;
+                if(wine) {
+                    if(wine.frontImg) html += `<div style="position:absolute; inset:0; background-image:url(${wine.frontImg}); background-size:cover; background-position:center; border-radius:10px; z-index:1;"></div>`;
+                    html += `<div class="slot-info" style="z-index:2;">${wine.name}</div>`;
+                } else {
+                    html += `<span style="font-size:24px; color:#444;">+</span><span style="font-size:12px; color:var(--text-muted);">빈 칸</span>`;
+                }
+                html += `</div>`;
+                grid.innerHTML += html;
+            }
+        }
+
+        function clickSlot(num) {
+            if(wineStorage[num]) {
+                openModal(wineStorage[num]);
+            } else {
+                document.getElementById('selectedSlot').value = num;
+                switchTab('record');
+            }
+        }
+
+        function saveWine() {
+            const name = document.getElementById('wName').value;
+            let slot = document.getElementById('selectedSlot').value;
+            
+            if(!name) return alert('와인 이름을 입력해 주세요.');
+            if(!slot) {
+                for(let i=1; i<=10; i++) {
+                    if(!wineStorage[i]) { slot = i; break; }
+                }
+                if(!slot) return alert('셀러가 꽉 찼습니다!');
+            }
+
+            const wineData = {
+                id: Date.now(),
+                slot: slot,
+                name: name,
+                vintage: document.getElementById('wVintage').value,
+                region: document.getElementById('wRegion').value,
+                variety: document.getElementById('wVariety').value,
+                price: document.getElementById('wPrice').value,
+                abv: document.getElementById('wAbv').value,
+                ratings: { ...ratings },
+                memo: document.getElementById('wMemo').value,
+                frontImg: document.getElementById('imgFront').src || null
+            };
+
+            wineStorage[slot] = wineData;
+            try {
+                localStorage.setItem('symptomer_wines', JSON.stringify(wineStorage));
+            } catch(e) {}
+            
+            resetForm();
+            renderCellar();
+            renderList();
+            switchTab('cellar');
+        }
+
+        function resetForm() {
+            document.getElementById('wName').value = '';
+            document.getElementById('wVintage').value = '';
+            document.getElementById('wRegion').value = '';
+            document.getElementById('wVariety').value = '';
+            document.getElementById('wPrice').value = '';
+            document.getElementById('wAbv').value = '';
+            document.getElementById('wMemo').value = '';
+            document.getElementById('selectedSlot').value = '';
+            if(document.getElementById('imgFront')) document.getElementById('imgFront').style.display = 'none';
+            if(document.getElementById('imgBack')) document.getElementById('imgBack').style.display = 'none';
+            document.querySelectorAll('.star').forEach(s => s.classList.remove('selected'));
+            ratings = { sweet: 0, acid: 0, tannin: 0, body: 0, finish: 0 };
+        }
+
+        function renderList() {
+            const container = document.getElementById('wineListContainer');
+            if(!container) return;
+            container.innerHTML = '';
+            
+            Object.values(wineStorage).forEach(wine => {
+                if(!wine) return;
+                const card = document.createElement('div');
+                card.className = 'wine-list-card';
+                card.onclick = () => openModal(wine);
+                
+                card.innerHTML = `
+                    <img class="wine-list-img" src="${wine.frontImg || 'data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\"><path fill=\"%23444\" d=\"M12 2A10 10 0 0 0 2 12a10 10 0 0 0 10 10a10 10 0 0 0 10-10A10 10 0 0 0 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8s8 3.59 8 8s-3.59 8-8 8z\"/></svg>'}" />
+                    <div class="wine-list-info">
+                        <div style="font-weight:bold; font-size:16px;">${wine.name}</div>
+                        <div style="font-size:13px; color:var(--text-muted); margin-top:4px;">${wine.region} · ${wine.vintage || 'NV'}</div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        async function openModal(wine) {
+            document.getElementById('mName').innerText = wine.name;
+            document.getElementById('mMeta').innerText = `${wine.region} / ${wine.vintage || 'NV'}`;
+            document.getElementById('mPrice').innerText = wine.price || '미입력';
+            document.getElementById('mAbv').innerText = wine.abv || '미입력';
+            document.getElementById('mVariety').innerText = wine.variety || '미입력';
+            document.getElementById('mMemo').innerText = wine.memo || '남겨진 메모가 없습니다.';
+            
+            const mImg = document.getElementById('mImg');
+            if(wine.frontImg && wine.frontImg.startsWith('data:')) {
+                mImg.src = wine.frontImg;
+                mImg.style.display = 'block';
+            } else {
+                mImg.style.display = 'none';
+            }
+
+            document.getElementById('detailModal').style.display = 'block';
+
+            const ctx = document.getElementById('radarChart').getContext('2d');
+            if(currentChart) currentChart.destroy();
+            
+            currentChart = new Chart(ctx, {
+                type: 'radar',
+                data: {
+                    labels: ['단맛', '신맛', '타닌', '바디', '여운'],
+                    datasets: [{
+                        data: [wine.ratings.sweet, wine.ratings.acid, wine.ratings.tannin, wine.ratings.body, wine.ratings.finish],
+                        backgroundColor: 'rgba(255, 71, 87, 0.2)',
+                        borderColor: '#ff4757',
+                        pointBackgroundColor: '#ff4757'
+                    }]
+                },
+                options: {
+                    scales: { r: { min: 0, max: 5, ticks: { display: false }, grid: { color: '#333' }, angleLines: { color: '#333' } } },
+                    plugins: { legend: { display: false } }
+                }
+            });
+
+            const pBox = document.getElementById('aiPairingBox');
+            const key = getApiKey();
+            if(!key) {
+                pBox.innerText = "💡 메인 화면에 Gemini API Key를 입력하시면 소믈리에 AI의 특별한 한식 마리아주 추천 기능이 활성화됩니다.";
+                return;
+            }
+
+            pBox.innerText = "🍷 AI 소믈리에가 한식 매칭을 분석하고 있습니다...";
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`;
+            const prompt = `Based on this wine (${wine.name}, ${wine.variety} variety, Sweetness:${wine.ratings.sweet}/5, Acidity:${wine.ratings.acid}/5), recommend 3 matching Korean dishes (한식 페어링) and provide a 2-sentence sommelier review in friendly Korean language.`;
+
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+                });
+                const result = await response.json();
+                pBox.innerText = result.candidates[0].content.parts[0].text;
+            } catch(e) {
+                pBox.innerText = "페어링 추천 로딩 실패 (API 키 상태를 확인하세요)";
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('detailModal').style.display = 'none';
+        }
+    </script>
+</body>
+</html>
