@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Symptomer's Wine Cellar</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-color: #121212;
+            --card-bg: #1e1e1e;
+            --accent-color: #800020;
+            --text-color: #e0e0e0;
+            --text-muted: #888888;
+            --border-color: #333333;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
+        body { background-color: var(--bg-color); color: var(--text-color); padding-bottom: 80px; -webkit-tap-highlight-color: transparent; }
+        
+        .tab-bar { position: fixed; bottom: 0; left: 0; right: 0; height: 65px; background-color: var(--card-bg); display: flex; border-top: 1px solid var(--border-color); z-index: 1000; }
+        .tab-item { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-muted); font-size: 12px; cursor: pointer; background: none; border: none; }
+        .tab-item.active { color: #ff4757; font-weight: bold; }
+        .tab-item svg { width: 24px; height: 24px; margin-bottom: 4px; fill: currentColor; }
+
+        .container { padding: 16px; max-width: 600px; margin: 0 auto; display: none; }
+        .container.active { display: block; }
+        h1 { font-size: 23px; margin-bottom: 20px; text-align: center; color: #fff; }
+
+        /* 설정 세팅 영역 */
+        .key-setting-box { background-color: #1a1a24; border: 1px solid #3b3b4f; border-radius: 8px; padding: 12px; margin-bottom: 20px; }
+
+        .cellar-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 10px; }
+        .cellar-slot { background-color: var(--card-bg); border: 2px dashed var(--border-color); border-radius: 12px; height: 110px; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; cursor: pointer; }
+        .cellar-slot.occupied { border-style: solid; border-color: var(--accent-color); }
+        .slot-num { position: absolute; top: 8px; left: 8px; font-size: 11px; color: var(--text-muted); background: rgba(0,0,0,0.5); padding: 2px 6px; border-radius: 8px; }
+        .slot-info { text-align: center; padding: 8px; background: rgba(0,0,0,0.7); width: 100%; position: absolute; bottom: 0; border-bottom-left-radius: 10px; border-bottom-right-radius: 10px; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+        .form-group { margin-bottom: 16px; }
+        .form-group label { display: block; font-size: 14px; margin-bottom: 6px; color: var(--text-muted); }
+        .form-control { width: 100%; background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; color: #fff; font-size: 16px; }
+        
+        .photo-row { display: flex; gap: 12px; margin-bottom: 16px; }
+        .photo-uploader { flex: 1; height: 130px; background-color: var(--card-bg); border: 1px dashed var(--border-color); border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; position: relative; overflow: hidden; }
+        .photo-uploader img { width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0; }
+        .photo-uploader span { font-size: 13px; color: var(--text-muted); text-align: center; padding: 0 8px; }
+
+        .star-rating { display: flex; gap: 8px; }
+        .star { font-size: 26px; color: #444; cursor: pointer; }
+        .star.selected { color: #ffd32a; }
+
+        .btn { width: 100%; padding: 14px; border-radius: 8px; border: none; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+        .btn-primary { background-color: #ff4757; color: #fff; }
+        .btn-secondary { background-color: #2f3542; color: #fff; }
+
+        .ai-status { text-align: center; padding: 10px; color: #ffd32a; font-size: 14px; display: none; }
+        .ai-box { background-color: #1e272e; border-left: 4px solid #ffd32a; padding: 12px; border-radius: 4px; margin-top: 10px; font-size: 14px; line-height: 1.5; }
+
+        .wine-list-card { background-color: var(--card-bg); border-radius: 12px; padding: 12px; display: flex; gap: 12px; margin-bottom: 12px; cursor: pointer; }
+        .wine-list-img { width: 70px; height: 70px; background-color: #2b2b2b; border
